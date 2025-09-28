@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎙️ Audio Emotion Classifier Pro - API Only</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body { font-family: 'Inter', sans-serif; }
+        
+        .emotion-bar {
+            transition: width 0.5s ease-in-out;
+        }
+        
+        .recording {
+            animation: pulse 1.5s ease-in-out infinite alternate;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+        
+        .segment-timeline {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .segment-block {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .segment-block:hover {
+            opacity: 0.8;
+            transform: scale(1.02);
+        }
+        
+        .emotion-happy { background-color: #fbbf24; }
+        .emotion-sad { background-color: #3b82f6; }
+        .emotion-angry { background-color: #ef4444; }
+        .emotion-fear { background-color: #8b5cf6; }
+        .emotion-surprise { background-color: #10b981; }
+        .emotion-disgust { background-color: #f59e0b; }
+        .emotion-neutral { background-color: #6b7280; }
+        
+        .glassmorphism {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .audio-visualizer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            height: 40px;
+        }
+        
+        .audio-bar {
+            width: 3px;
+            background: #3b82f6;
+            animation: audioWave 1s ease-in-out infinite alternate;
+        }
+        
+        .audio-bar:nth-child(odd) {
+            animation-delay: 0.1s;
+        }
+        
+        .audio-bar:nth-child(even) {
+            animation-delay: 0.2s;
+        }
+        
+        @keyframes audioWave {
+            0% { height: 10px; }
+            100% { height: 30px; }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <!-- Header -->
+    <header class="gradient-bg shadow-2xl">
+        <div class="container mx-auto px-6 py-8">
+            <div class="text-center">
+                <h1 class="text-5xl font-bold mb-4">🎙️ Audio Emotion Classifier Pro</h1>
+                <p class="text-xl opacity-90">Real-time AI-Powered Audio Emotion Recognition - API Only Version</p>
+                <div class="mt-6 flex justify-center items-center space-x-4">
+                    <div class="flex items-center space-x-2">
+                        <div id="status-indicator" class="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                        <span id="status-text" class="text-sm">Ready</span>
+                    </div>
+                    <div class="text-sm opacity-75">
+                        FPS: <span id="fps-counter">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-6 py-8">
+        <div class="grid lg:grid-cols-3 gap-8">
+            <!-- Main Controls -->
+            <div class="lg:col-span-2 space-y-8">
+                <!-- Audio Input Section -->
+                <div class="glassmorphism rounded-2xl p-8">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center">
+                        <span class="mr-3">🎵</span> Audio Input
+                    </h2>
+                    
+                    <!-- Recording Section -->
+                    <div class="mb-8">
+                        <h3 class="text-lg font-semibold mb-4">Real-time Recording</h3>
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <div class="flex flex-col items-center space-y-4">
+                                <div class="audio-visualizer" id="audioVisualizer">
+                                    <!-- Audio bars will be generated here -->
+                                </div>
+                                <div class="flex space-x-4">
+                                    <button id="startRecording" 
+                                            class="bg-red-500 hover:bg-red-600 px-6 py-3 rounded-lg font-semibold transition-all">
+                                        🎙️ Start Recording
+                                    </button>
+                                    <button id="stopRecording" 
+                                            class="bg-gray-500 hover:bg-gray-600 px-6 py-3 rounded-lg font-semibold transition-all" 
+                                            disabled>
+                                        ⏹️ Stop Recording
+                                    </button>
+                                </div>
+                                <div id="recordingStatus" class="text-center text-sm opacity-75"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- File Upload Section -->
+                    <div class="mb-8">
+                        <h3 class="text-lg font-semibold mb-4">Upload Audio File</h3>
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <div class="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center hover:border-blue-400 transition-colors"
+                                 id="dropzone">
+                                <input type="file" id="audioFile" accept="audio/*" class="hidden">
+                                <div class="space-y-4">
+                                    <div class="text-4xl">🎵</div>
+                                    <div>
+                                        <p class="text-lg">Drop an audio file here or click to browse</p>
+                                        <p class="text-sm opacity-75">Supports: MP3, WAV, M4A, OGG (max 25MB)</p>
+                                    </div>
+                                    <button onclick="document.getElementById('audioFile').click()" 
+                                            class="bg-blue-500 hover:bg-blue-600 px-6 py-2 rounded-lg font-semibold transition-all">
+                                        Choose File
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="fileInfo" class="mt-4 hidden">
+                                <div class="bg-gray-700 rounded-lg p-4 flex items-center justify-between">
+                                    <div>
+                                        <div class="font-semibold" id="fileName"></div>
+                                        <div class="text-sm opacity-75" id="fileSize"></div>
+                                    </div>
+                                    <button id="analyzeFile" 
+                                            class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-lg font-semibold transition-all">
+                                        Analyze
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Processing Status -->
+                    <div id="processingStatus" class="hidden">
+                        <div class="bg-blue-900 rounded-xl p-6">
+                            <div class="flex items-center justify-center space-x-4">
+                                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
+                                <span class="text-lg">Processing audio...</span>
+                            </div>
+                            <div class="mt-4">
+                                <div class="bg-gray-700 rounded-full h-2">
+                                    <div id="progressBar" class="bg-blue-400 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Section -->
+                <div id="resultsSection" class="glassmorphism rounded-2xl p-8 hidden">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center">
+                        <span class="mr-3">📊</span> Analysis Results
+                    </h2>
+
+                    <!-- Overall Results -->
+                    <div class="mb-8">
+                        <div class="grid md:grid-cols-3 gap-6">
+                            <div class="bg-gray-800 rounded-xl p-6 text-center">
+                                <div class="text-3xl mb-2" id="overallEmotionIcon">😐</div>
+                                <div class="text-xl font-bold" id="overallEmotion">Neutral</div>
+                                <div class="text-sm opacity-75">Overall Emotion</div>
+                            </div>
+                            <div class="bg-gray-800 rounded-xl p-6 text-center">
+                                <div class="text-3xl mb-2">⏱️</div>
+                                <div class="text-xl font-bold" id="audioDuration">0.0s</div>
+                                <div class="text-sm opacity-75">Duration</div>
+                            </div>
+                            <div class="bg-gray-800 rounded-xl p-6 text-center">
+                                <div class="text-3xl mb-2">👥</div>
+                                <div class="text-xl font-bold" id="speakerCount">1</div>
+                                <div class="text-sm opacity-75">Speakers</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Timeline Visualization -->
+                    <div class="mb-8">
+                        <h3 class="text-lg font-semibold mb-4">Emotion Timeline</h3>
+                        <div class="bg-gray-800 rounded-xl p-6">
+                            <div id="emotionTimeline" class="segment-timeline h-20 rounded-lg relative">
+                                <!-- Timeline segments will be generated here -->
+                            </div>
+                            <div class="mt-4 flex flex-wrap gap-4 text-sm">
+                                <div class="flex items-center"><div class="w-4 h-4 emotion-happy rounded mr-2"></div>Happy</div>
+                                <div class="flex items-center"><div class="w-4 h-4 emotion-sad rounded mr-2"></div>Sad</div>
+                                <div class="flex items-center"><div class="w-4 h-4 emotion-angry rounded mr-2"></div>Angry</div>
+                                <div class="flex items-center"><div class="w-4 h-4 emotion-fear rounded mr-2"></div>Fear</div>
+                                <div class="flex items-center"><div class="w-4 h-4 emotion-surprise rounded mr-2"></div>Surprise</div>
+                                <div class="flex items-center"><div class="w-4 h-4 emotion-neutral rounded mr-2"></div>Neutral</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Segment Details -->
+                    <div class="mb-8">
+                        <h3 class="text-lg font-semibold mb-4">Detailed Segments</h3>
+                        <div id="segmentDetails" class="space-y-4">
+                            <!-- Segment cards will be generated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings & Info Sidebar -->
+            <div class="space-y-8">
+                <!-- Model Settings -->
+                <div class="glassmorphism rounded-2xl p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <span class="mr-3">🤖</span> AI Model Settings
+                    </h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Provider</label>
+                            <select id="modelProvider" class="w-full bg-gray-800 rounded-lg p-3 border border-gray-600 focus:border-blue-400 focus:outline-none">
+                                <option value="huggingface">🤗 Hugging Face</option>
+                                <option value="groq">⚡ Groq</option>
+                                <option value="openrouter">🔗 OpenRouter</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Specific Model</label>
+                            <select id="specificModel" class="w-full bg-gray-800 rounded-lg p-3 border border-gray-600 focus:border-blue-400 focus:outline-none">
+                                <option value="">Default</option>
+                            </select>
+                        </div>
+                        
+                        <div class="flex items-center space-x-3">
+                            <input type="checkbox" id="includeDiarization" checked class="w-5 h-5 text-blue-500">
+                            <label for="includeDiarization" class="text-sm">Enable Speaker Diarization</label>
+                        </div>
+                        
+                        <div class="flex items-center space-x-3">
+                            <input type="checkbox" id="returnSegments" checked class="w-5 h-5 text-blue-500">
+                            <label for="returnSegments" class="text-sm">Return Detailed Segments</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Confidence Scores -->
+                <div class="glassmorphism rounded-2xl p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <span class="mr-3">📈</span> Confidence Scores
+                    </h3>
+                    
+                    <div id="confidenceScores" class="space-y-3">
+                        <!-- Confidence bars will be generated here -->
+                    </div>
+                </div>
+
+                <!-- System Info -->
+                <div class="glassmorphism rounded-2xl p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <span class="mr-3">⚙️</span> System Info
+                    </h3>
+                    
+                    <div class="space-y-3 text-sm">
+                        <div class="flex justify-between">
+                            <span>Processing Time:</span>
+                            <span id="processingTime">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Sample Rate:</span>
+                            <span id="sampleRate">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Model Used:</span>
+                            <span id="modelUsed">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>WebSocket:</span>
+                            <span id="websocketStatus">Disconnected</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent History -->
+                <div class="glassmorphism rounded-2xl p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <span class="mr-3">📜</span> Recent Analysis
+                    </h3>
+                    
+                    <div id="recentHistory" class="space-y-2 text-sm">
+                        <div class="text-center text-gray-400 py-4">No recent analysis</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 mt-16 py-8">
+        <div class="container mx-auto px-6 text-center">
+            <div class="mb-4">
+                <h4 class="text-lg font-semibold mb-2">Audio Emotion Classifier Pro</h4>
+                <p class="text-gray-400">Real-time AI-powered emotion recognition with speaker diarization</p>
+            </div>
+            <div class="flex justify-center space-x-6 mb-4">
+                <a href="/docs" class="text-blue-400 hover:text-blue-300 transition-colors">API Docs</a>
+                <a href="/health" class="text-green-400 hover:text-green-300 transition-colors">Health Check</a>
+                <a href="https://github.com" class="text-purple-400 hover:text-purple-300 transition-colors">GitHub</a>
+            </div>
+            <div class="text-gray-500 text-sm">
+                Made with ❤️ using FastAPI, WebSocket, and AI • © 2024
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Global variables
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+        let websocket = null;
+        let fpsCounter = 0;
+        let lastFrameTime = 0;
+        
+        // Emotion icons mapping
+        const emotionIcons = {
+            'happy': '😊',
+            'sad': '😢',
+            'angry': '😠',
+            'fear': '😨',
+            'surprise': '😲',
+            'disgust': '🤢',
+            'neutral': '😐',
+            'unknown': '❓'
+        };
+        
+        // DOM elements
+        const elements = {
+            startRecording: document.getElementById('startRecording'),
+            stopRecording: document.getElementById('stopRecording'),
+            audioFile: document.getElementById('audioFile'),
+            analyzeFile: document.getElementById('analyzeFile'),
+            dropzone: document.getElementById('dropzone'),
+            fileInfo: document.getElementById('fileInfo'),
+            fileName: document.getElementById('fileName'),
+            fileSize: document.getElementById('fileSize'),
+            processingStatus: document.getElementById('processingStatus'),
+            progressBar: document.getElementById('progressBar'),
+            resultsSection: document.getElementById('resultsSection'),
+            modelProvider: document.getElementById('modelProvider'),
+            specificModel: document.getElementById('specificModel'),
+            includeDiarization: document.getElementById('includeDiarization'),
+            returnSegments: document.getElementById('returnSegments'),
+            statusText: document.getElementById('status-text'),
+            statusIndicator: document.getElementById('status-indicator'),
+            fpsCounter: document.getElementById('fps-counter'),
+            websocketStatus: document.getElementById('websocketStatus')
+        };
+        
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', async function() {
+            await initializeApp();
+        });
+        
+        async function initializeApp() {
+            // Load available models
+            await loadAvailableModels();
+            
+            // Setup event listeners
+            setupEventListeners();
+            
+            // Initialize WebSocket for real-time processing
+            initializeWebSocket();
+            
+            // Initialize audio visualizer
+            initializeAudioVisualizer();
+            
+            // Update status
+            updateStatus('ready', 'Ready');
+        }
+        
+        function setupEventListeners() {
+            // Recording controls
+            elements.startRecording.addEventListener('click', startRecording);
+            elements.stopRecording.addEventListener('click', stopRecording);
+            
+            // File upload
+            elements.audioFile.addEventListener('change', handleFileSelect);
+            elements.analyzeFile.addEventListener('click', analyzeUploadedFile);
+            
+            // Drag and drop
+            elements.dropzone.addEventListener('dragover', handleDragOver);
+            elements.dropzone.addEventListener('drop', handleDrop);
+            elements.dropzone.addEventListener('click', () => elements.audioFile.click());
+            
+            // Model selection
+            elements.modelProvider.addEventListener('change', onModelProviderChange);
+        }
+        
+        async function loadAvailableModels() {
+            try {
+                const response = await fetch('/api/models');
+                const data = await response.json();
+                
+                // Update specific model options
+                updateSpecificModelOptions(data.available_models);
+                
+                console.log('Available models loaded:', data);
+            } catch (error) {
+                console.error('Error loading models:', error);
+                showNotification('Failed to load available models', 'error');
+            }
+        }
+        
+        function updateSpecificModelOptions(models) {
+            const provider = elements.modelProvider.value;
+            elements.specificModel.innerHTML = '<option value="">Default</option>';
+            
+            if (models[provider]) {
+                models[provider].forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model.id;
+                    option.textContent = model.name;
+                    option.title = model.description;
+                    elements.specificModel.appendChild(option);
+                });
+            }
+        }
+        
+        function onModelProviderChange() {
+            loadAvailableModels();
+        }
+        
+        function initializeWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+            
+            try {
+                websocket = new WebSocket(wsUrl);
+                
+                websocket.onopen = function(event) {
+                    console.log('WebSocket connected');
+                    updateWebSocketStatus('Connected', 'green');
+                };
+                
+                websocket.onmessage = function(event) {
+                    const message = JSON.parse(event.data);
+                    handleWebSocketMessage(message);
+                };
+                
+                websocket.onclose = function(event) {
+                    console.log('WebSocket disconnected');
+                    updateWebSocketStatus('Disconnected', 'red');
+                    
+                    // Attempt to reconnect after 3 seconds
+                    setTimeout(() => {
+                        if (!websocket || websocket.readyState === WebSocket.CLOSED) {
+                            initializeWebSocket();
+                        }
+                    }, 3000);
+                };
+                
+                websocket.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    updateWebSocketStatus('Error', 'red');
+                };
+            } catch (error) {
+                console.error('Failed to initialize WebSocket:', error);
+                updateWebSocketStatus('Failed', 'red');
+            }
+        }
+        
+        function handleWebSocketMessage(message) {
+            switch (message.type) {
+                case 'emotion_result':
+                    handleEmotionResult(message.data, true);
+                    updateFPS();
+                    break;
+                case 'error':
+                    console.error('WebSocket error:', message.data);
+                    showNotification(message.data.message, 'error');
+                    break;
+                case 'pong':
+                    // Handle ping/pong for keep-alive
+                    break;
+            }
+        }
+        
+        function updateWebSocketStatus(status, color) {
+            elements.websocketStatus.textContent = status;
+            elements.websocketStatus.className = `text-${color}-400`;
+        }
+        
+        function updateFPS() {
+            const now = performance.now();
+            if (lastFrameTime) {
+                const fps = 1000 / (now - lastFrameTime);
+                elements.fpsCounter.textContent = fps.toFixed(1);
+            }
+            lastFrameTime = now;
+        }
+        
+        function initializeAudioVisualizer() {
+            const visualizer = document.getElementById('audioVisualizer');
+            
+            // Create audio bars
+            for (let i = 0; i < 20; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'audio-bar';
+                visualizer.appendChild(bar);
+            }
+        }
+        
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        sampleRate: 16000,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    } 
+                });
+                
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'audio/webm;codecs=opus'
+                });
+                
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = function(event) {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                        
+                        // Process audio chunk in real-time if WebSocket is connected
+                        if (websocket && websocket.readyState === WebSocket.OPEN) {
+                            processAudioChunk(event.data);
+                        }
+                    }
+                };
+                
+                mediaRecorder.onstop = function() {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    processRecordedAudio(audioBlob);
+                    
+                    // Stop all tracks
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                // Start recording with small chunks for real-time processing
+                mediaRecorder.start(1000); // 1 second chunks
+                isRecording = true;
+                
+                // Update UI
+                elements.startRecording.disabled = true;
+                elements.stopRecording.disabled = false;
+                elements.startRecording.className = elements.startRecording.className.replace('bg-red-500', 'bg-gray-500');
+                elements.stopRecording.className = elements.stopRecording.className.replace('bg-gray-500', 'bg-red-500');
+                
+                // Add recording animation
+                document.getElementById('audioVisualizer').classList.add('recording');
+                
+                updateStatus('recording', 'Recording...');
+                document.getElementById('recordingStatus').textContent = 'Recording in progress...';
+                
+            } catch (error) {
+                console.error('Error starting recording:', error);
+                showNotification('Failed to start recording. Please check microphone permissions.', 'error');
+            }
+        }
+        
+        function stopRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                
+                // Update UI
+                elements.startRecording.disabled = false;
+                elements.stopRecording.disabled = true;
+                elements.startRecording.className = elements.startRecording.className.replace('bg-gray-500', 'bg-red-500');
+                elements.stopRecording.className = elements.stopRecording.className.replace('bg-red-500', 'bg-gray-500');
+                
+                // Remove recording animation
+                document.getElementById('audioVisualizer').classList.remove('recording');
+                
+                updateStatus('processing', 'Processing...');
+                document.getElementById('recordingStatus').textContent = 'Processing recording...';
+            }
+        }
+        
+        async function processAudioChunk(audioBlob) {
+            try {
+                const reader = new FileReader();
+                reader.onload = function() {
+                    const base64Audio = btoa(
+                        new Uint8Array(reader.result)
+                        .reduce((data, byte) => data + String.fromCharCode(byte), '')
+                    );
+                    
+                    const message = {
+                        type: 'audio_chunk',
+                        data: {
+                            audio_data: base64Audio,
+                            model_provider: elements.modelProvider.value,
+                            model_name: elements.specificModel.value || null,
+                            include_diarization: elements.includeDiarization.checked,
+                            return_segments: elements.returnSegments.checked
+                        }
+                    };
+                    
+                    if (websocket && websocket.readyState === WebSocket.OPEN) {
+                        websocket.send(JSON.stringify(message));
+                    }
+                };
+                
+                reader.readAsArrayBuffer(audioBlob);
+            } catch (error) {
+                console.error('Error processing audio chunk:', error);
+            }
+        }
+        
+        async function processRecordedAudio(audioBlob) {
+            try {
+                const reader = new FileReader();
+                reader.onload = async function() {
+                    const base64Audio = btoa(
+                        new Uint8Array(reader.result)
+                        .reduce((data, byte) => data + String.fromCharCode(byte), '')
+                    );
+                    
+                    await processAudioData(base64Audio, 'recording');
+                };
+                
+                reader.readAsArrayBuffer(audioBlob);
+            } catch (error) {
+                console.error('Error processing recorded audio:', error);
+                showNotification('Failed to process recording', 'error');
+            }
+        }
+        
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                displayFileInfo(file);
+            }
+        }
+        
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.currentTarget.classList.add('border-blue-400');
+        }
+        
+        function handleDrop(event) {
+            event.preventDefault();
+            event.currentTarget.classList.remove('border-blue-400');
+            
+            const files = event.dataTransfer.files;
+            if (files.length > 0 && files[0].type.startsWith('audio/')) {
+                elements.audioFile.files = files;
+                displayFileInfo(files[0]);
+            } else {
+                showNotification('Please drop a valid audio file', 'error');
+            }
+        }
+        
+        function displayFileInfo(file) {
+            elements.fileName.textContent = file.name;
+            elements.fileSize.textContent = `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
+            elements.fileInfo.classList.remove('hidden');
+        }
+        
+        async function analyzeUploadedFile() {
+            const file = elements.audioFile.files[0];
+            if (!file) {
+                showNotification('Please select an audio file first', 'error');
+                return;
+            }
+            
+            if (file.size > 25 * 1024 * 1024) {
+                showNotification('File too large. Maximum size is 25MB.', 'error');
+                return;
+            }
+            
+            try {
+                showProcessingStatus(true);
+                
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('model_provider', elements.modelProvider.value);
+                formData.append('model_name', elements.specificModel.value || '');
+                formData.append('include_diarization', elements.includeDiarization.checked);
+                formData.append('return_segments', elements.returnSegments.checked);
+                
+                const response = await fetch('/api/detect/file', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    handleEmotionResult(result, false);
+                    addToHistory(`File: ${file.name}`, result.overall_emotion, result.processing_time_ms);
+                } else {
+                    throw new Error(result.detail || 'Analysis failed');
+                }
+                
+            } catch (error) {
+                console.error('Error analyzing file:', error);
+                showNotification(`Analysis failed: ${error.message}`, 'error');
+            } finally {
+                showProcessingStatus(false);
+                updateStatus('ready', 'Ready');
+            }
+        }
+        
+        async function processAudioData(base64Audio, source) {
+            try {
+                showProcessingStatus(true);
+                
+                const requestData = {
+                    audio_data: base64Audio,
+                    model_provider: elements.modelProvider.value,
+                    model_name: elements.specificModel.value || null,
+                    include_diarization: elements.includeDiarization.checked,
+                    return_segments: elements.returnSegments.checked
+                };
+                
+                const response = await fetch('/api/detect', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    handleEmotionResult(result, false);
+                    addToHistory(source, result.overall_emotion, result.processing_time_ms);
+                } else {
+                    throw new Error(result.detail || 'Analysis failed');
+                }
+                
+            } catch (error) {
+                console.error('Error processing audio:', error);
+                showNotification(`Analysis failed: ${error.message}`, 'error');
+            } finally {
+                showProcessingStatus(false);
+                updateStatus('ready', 'Ready');
+                document.getElementById('recordingStatus').textContent = '';
+            }
+        }
+        
+        function handleEmotionResult(result, isRealTime = false) {
+            if (result.error) {
+                showNotification(result.error, 'error');
+                return;
+            }
+            
+            // Update overall results
+            document.getElementById('overallEmotionIcon').textContent = emotionIcons[result.overall_emotion] || '❓';
+            document.getElementById('overallEmotion').textContent = result.overall_emotion || 'Unknown';
+            document.getElementById('audioDuration').textContent = `${result.duration_seconds?.toFixed(1)}s`;
+            document.getElementById('speakerCount').textContent = new Set(result.segments?.map(s => s.speaker)).size || 1;
+            
+            // Update system info
+            if (result.processing_time_ms) {
+                document.getElementById('processingTime').textContent = `${result.processing_time_ms.toFixed(0)}ms`;
+            }
+            document.getElementById('sampleRate').textContent = `${result.sample_rate}Hz`;
+            document.getElementById('modelUsed').textContent = result.processing_info?.model_name || result.processing_info?.model_provider || 'Unknown';
+            
+            // Update confidence scores
+            updateConfidenceScores(result.confidence_scores);
+            
+            // Update timeline visualization
+            updateEmotionTimeline(result.segments, result.duration_seconds);
+            
+            // Update segment details
+            updateSegmentDetails(result.segments);
+            
+            // Show results section
+            elements.resultsSection.classList.remove('hidden');
+            
+            // Scroll to results if not real-time
+            if (!isRealTime) {
+                elements.resultsSection.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+        
+        function updateConfidenceScores(scores) {
+            const container = document.getElementById('confidenceScores');
+            container.innerHTML = '';
+            
+            if (!scores) return;
+            
+            // Sort emotions by confidence
+            const sortedEmotions = Object.entries(scores)
+                .sort(([,a], [,b]) => b - a)
+                .slice(0, 6); // Show top 6 emotions
+            
+            sortedEmotions.forEach(([emotion, confidence]) => {
+                const scoreElement = document.createElement('div');
+                scoreElement.className = 'space-y-1';
+                
+                scoreElement.innerHTML = `
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="flex items-center">
+                            <span class="mr-2">${emotionIcons[emotion] || '❓'}</span>
+                            ${emotion.charAt(0).toUpperCase() + emotion.slice(1)}
+                        </span>
+                        <span class="font-mono">${(confidence * 100).toFixed(1)}%</span>
+                    </div>
+                    <div class="w-full bg-gray-700 rounded-full h-2">
+                        <div class="emotion-bar bg-blue-400 h-2 rounded-full" style="width: ${confidence * 100}%"></div>
+                    </div>
+                `;
+                
+                container.appendChild(scoreElement);
+            });
+        }
+        
+        function updateEmotionTimeline(segments, duration) {
+            const timeline = document.getElementById('emotionTimeline');
+            timeline.innerHTML = '';
+            
+            if (!segments || segments.length === 0) return;
+            
+            const totalDuration = duration * 1000; // Convert to milliseconds
+            
+            segments.forEach((segment, index) => {
+                const segmentElement = document.createElement('div');
+                segmentElement.className = `segment-block emotion-${segment.emotion}`;
+                
+                const startPercent = (segment.start_ms / totalDuration) * 100;
+                const widthPercent = ((segment.end_ms - segment.start_ms) / totalDuration) * 100;
+                
+                segmentElement.style.left = `${startPercent}%`;
+                segmentElement.style.width = `${widthPercent}%`;
+                
+                segmentElement.title = `
+                    ${segment.speaker}: ${segment.emotion}
+                    ${(segment.start_ms / 1000).toFixed(1)}s - ${(segment.end_ms / 1000).toFixed(1)}s
+                    Confidence: ${(segment.confidence * 100).toFixed(1)}%
+                `;
+                
+                segmentElement.addEventListener('click', () => {
+                    showSegmentDetails(segment);
+                });
+                
+                timeline.appendChild(segmentElement);
+            });
+        }
+        
+        function updateSegmentDetails(segments) {
+            const container = document.getElementById('segmentDetails');
+            container.innerHTML = '';
+            
+            if (!segments || segments.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-400 py-4">No segments found</div>';
+                return;
+            }
+            
+            segments.forEach((segment, index) => {
+                const segmentCard = document.createElement('div');
+                segmentCard.className = 'bg-gray-800 rounded-xl p-4 hover:bg-gray-750 transition-colors cursor-pointer';
+                
+                segmentCard.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center space-x-3">
+                            <div class="text-2xl">${emotionIcons[segment.emotion] || '❓'}</div>
+                            <div>
+                                <div class="font-semibold">${segment.speaker}</div>
+                                <div class="text-sm text-gray-400">${segment.emotion}</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-mono text-sm">${(segment.confidence * 100).toFixed(1)}%</div>
+                            <div class="text-xs text-gray-400">${(segment.start_ms / 1000).toFixed(1)}s - ${(segment.end_ms / 1000).toFixed(1)}s</div>
+                        </div>
+                    </div>
+                    
+                    ${segment.transcription ? `
+                        <div class="mt-3 p-3 bg-gray-700 rounded-lg">
+                            <div class="text-sm font-medium mb-1">Transcription:</div>
+                            <div class="text-sm text-gray-300">${segment.transcription}</div>
+                        </div>
+                    ` : ''}
+                    
+                    ${segment.all_scores ? `
+                        <div class="mt-3">
+                            <div class="text-sm font-medium mb-2">All Scores:</div>
+                            <div class="grid grid-cols-2 gap-2 text-xs">
+                                ${Object.entries(segment.all_scores)
+                                    .sort(([,a], [,b]) => b - a)
+                                    .map(([emotion, score]) => `
+                                        <div class="flex justify-between">
+                                            <span>${emotion}:</span>
+                                            <span class="font-mono">${(score * 100).toFixed(0)}%</span>
+                                        </div>
+                                    `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+                `;
+                
+                container.appendChild(segmentCard);
+            });
+        }
+        
+        function showSegmentDetails(segment) {
+            alert(`Segment Details:\n\nSpeaker: ${segment.speaker}\nEmotion: ${segment.emotion}\nTime: ${(segment.start_ms / 1000).toFixed(1)}s - ${(segment.end_ms / 1000).toFixed(1)}s\nConfidence: ${(segment.confidence * 100).toFixed(1)}%${segment.transcription ? `\n\nTranscription: ${segment.transcription}` : ''}`);
+        }
+        
+        function showProcessingStatus(show) {
+            if (show) {
+                elements.processingStatus.classList.remove('hidden');
+                // Animate progress bar
+                let progress = 0;
+                const interval = setInterval(() => {
+                    progress += Math.random() * 15;
+                    if (progress > 90) {
+                        progress = 90;
+                        clearInterval(interval);
+                    }
+                    elements.progressBar.style.width = `${progress}%`;
+                }, 200);
+            } else {
+                elements.processingStatus.classList.add('hidden');
+                elements.progressBar.style.width = '0%';
+            }
+        }
+        
+        function updateStatus(type, text) {
+            elements.statusText.textContent = text;
+            
+            const indicator = elements.statusIndicator;
+            indicator.className = 'w-3 h-3 rounded-full';
+            
+            switch (type) {
+                case 'ready':
+                    indicator.classList.add('bg-green-400', 'animate-pulse');
+                    break;
+                case 'recording':
+                    indicator.classList.add('bg-red-400', 'animate-pulse');
+                    break;
+                case 'processing':
+                    indicator.classList.add('bg-yellow-400', 'animate-spin');
+                    break;
+                case 'error':
+                    indicator.classList.add('bg-red-500');
+                    break;
+            }
+        }
+        
+        function addToHistory(source, emotion, processingTime) {
+            const historyContainer = document.getElementById('recentHistory');
+            
+            // Remove "No recent analysis" message
+            if (historyContainer.children[0]?.textContent.includes('No recent')) {
+                historyContainer.innerHTML = '';
+            }
+            
+            const historyItem = document.createElement('div');
+            historyItem.className = 'bg-gray-800 rounded-lg p-3 border-l-4 border-blue-400';
+            
+            historyItem.innerHTML = `
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-sm font-medium">${source}</span>
+                    <span class="text-xs text-gray-400">${new Date().toLocaleTimeString()}</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span>${emotionIcons[emotion] || '❓'}</span>
+                    <span class="text-sm">${emotion}</span>
+                    ${processingTime ? `<span class="text-xs text-gray-400">(${processingTime.toFixed(0)}ms)</span>` : ''}
+                </div>
+            `;
+            
+            // Add to top of history
+            historyContainer.insertBefore(historyItem, historyContainer.firstChild);
+            
+            // Keep only last 5 items
+            while (historyContainer.children.length > 5) {
+                historyContainer.removeChild(historyContainer.lastChild);
+            }
+        }
+        
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm ${
+                type === 'error' ? 'bg-red-500' : 
+                type === 'success' ? 'bg-green-500' : 
+                'bg-blue-500'
+            } text-white`;
+            
+            notification.innerHTML = `
+                <div class="flex items-center space-x-2">
+                    <span>${type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️'}</span>
+                    <span>${message}</span>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-auto text-white hover:text-gray-200">×</button>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(event) {
+            if (event.key === ' ' && event.ctrlKey) {
+                event.preventDefault();
+                if (isRecording) {
+                    stopRecording();
+                } else {
+                    startRecording();
+                }
+            }
+        });
+        
+        // Auto-save settings
+        function saveSettings() {
+            const settings = {
+                modelProvider: elements.modelProvider.value,
+                specificModel: elements.specificModel.value,
+                includeDiarization: elements.includeDiarization.checked,
+                returnSegments: elements.returnSegments.checked
+            };
+            
+            localStorage.setItem('audioEmotionSettings', JSON.stringify(settings));
+        }
+        
+        function loadSettings() {
+            try {
+                const settings = JSON.parse(localStorage.getItem('audioEmotionSettings'));
+                if (settings) {
+                    elements.modelProvider.value = settings.modelProvider || 'huggingface';
+                    elements.specificModel.value = settings.specificModel || '';
+                    elements.includeDiarization.checked = settings.includeDiarization !== false;
+                    elements.returnSegments.checked = settings.returnSegments !== false;
+                }
+            } catch (error) {
+                console.log('No saved settings found');
+            }
+        }
+        
+        // Save settings on change
+        ['modelProvider', 'specificModel', 'includeDiarization', 'returnSegments'].forEach(id => {
+            elements[id].addEventListener('change', saveSettings);
+        });
+        
+        // Load settings on page load
+        document.addEventListener('DOMContentLoaded', loadSettings);
+        
+        // Periodic WebSocket ping to keep connection alive
+        setInterval(() => {
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                websocket.send(JSON.stringify({
+                    type: 'ping',
+                    timestamp: Date.now()
+                }));
+            }
+        }, 30000); // Every 30 seconds
+        
+        // Handle page visibility change (pause processing when tab is hidden)
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden && isRecording) {
+                console.log('Tab hidden, pausing real-time processing');
+            } else if (!document.hidden && isRecording) {
+                console.log('Tab visible, resuming real-time processing');
+            }
+        });
+        
+        // Performance monitoring
+        let performanceMetrics = {
+            totalRequests: 0,
+            totalProcessingTime: 0,
+            averageProcessingTime: 0,
+            lastRequestTime: null
+        };
+        
+        function updatePerformanceMetrics(processingTime) {
+            performanceMetrics.totalRequests++;
+            performanceMetrics.totalProcessingTime += processingTime;
+            performanceMetrics.averageProcessingTime = performanceMetrics.totalProcessingTime / performanceMetrics.totalRequests;
+            performanceMetrics.lastRequestTime = Date.now();
+            
+            console.log('Performance:', {
+                avgProcessingTime: performanceMetrics.averageProcessingTime.toFixed(2) + 'ms',
+                totalRequests: performanceMetrics.totalRequests
+            });
+        }
+        
+        // Error tracking
+        window.addEventListener('error', function(event) {
+            console.error('Application error:', event.error);
+            showNotification('An unexpected error occurred. Please refresh the page if issues persist.', 'error');
+        });
+        
+        // Service Worker registration (for offline support - optional)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js')
+                .then(registration => console.log('SW registered:', registration))
+                .catch(error => console.log('SW registration failed:', error));
+        }
+        
+        console.log('🎙️ Audio Emotion Classifier Pro initialized');
+        console.log('💡 Tip: Use Ctrl+Space to start/stop recording');
+    </script>
+</body>
+</html>
