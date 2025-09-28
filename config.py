@@ -21,17 +21,22 @@ class Settings(BaseSettings):
     sample_rate: int = 16000  # For reference only
     max_audio_duration_seconds: int = 300
     
-    # Hugging Face Audio Models (API-only)
-    default_hf_model: str = "superb/wav2vec2-base-superb-er"
-    backup_hf_model: str = "ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition"
-    
-    # Groq Models (Whisper + LLM)
+    # Model Configuration from Environment
+    hf_model_primary: str = "facebook/wav2vec2-large-xlsr-53-english"
+    hf_model_backup: str = "microsoft/speecht5_asr"
     groq_audio_model: str = "whisper-large-v3"
     groq_llm_model: str = "llama-3.2-11b-text-preview"
-    
-    # OpenRouter Models
     openrouter_model_1: str = "openai/whisper-1"
     openrouter_model_2: str = "anthropic/claude-3-haiku"
+    
+    # Backward compatibility properties
+    @property
+    def default_hf_model(self) -> str:
+        return self.hf_model_primary
+    
+    @property
+    def backup_hf_model(self) -> str:
+        return self.hf_model_backup
     
     class Config:
         env_file = ".env"
