@@ -21,13 +21,13 @@ class Settings(BaseSettings):
     sample_rate: int = 16000  # For reference only
     max_audio_duration_seconds: int = 300
     
-    # Model Configuration from Environment
-    hf_model_primary: str = "facebook/wav2vec2-large-xlsr-53-english"
-    hf_model_backup: str = "microsoft/speecht5_asr"
-    groq_audio_model: str = "whisper-large-v3"
-    groq_llm_model: str = "llama-3.2-11b-text-preview"
-    openrouter_model_1: str = "openai/whisper-1"
-    openrouter_model_2: str = "anthropic/claude-3-haiku"
+    # Model Configuration from Environment (ALL FREE MODELS)
+    hf_model_primary: str = "openai/whisper-tiny"
+    hf_model_backup: str = "facebook/wav2vec2-base-960h"
+    groq_audio_model: str = "whisper-large-v3-turbo"
+    groq_llm_model: str = "llama-3.1-8b-instant"
+    openrouter_model_1: str = "meta-llama/llama-3.1-8b-instruct:free"
+    openrouter_model_2: str = "nousresearch/hermes-3-llama-3.1-405b:free"
     
     # Backward compatibility properties
     @property

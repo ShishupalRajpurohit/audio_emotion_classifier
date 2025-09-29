@@ -26,7 +26,7 @@ class AudioEmotionDetector:
     async def process_audio(
         self,
         audio_data: Union[bytes, str],
-        model_provider: str = "groq",  # Default to Groq for better results
+        model_provider: str = "groq",  # Changed default to groq for transcription
         model_name: Optional[str] = None,
         include_diarization: bool = True,
         return_segments: bool = True
@@ -133,15 +133,12 @@ class AudioEmotionDetector:
             return {}
 
     async def _groq_transcription(self, audio_bytes: bytes) -> Dict:
-        """Get transcription from Groq Whisper with timing."""
+        """Get transcription from Groq Whisper (FREE API) with timing."""
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
+                # Groq requires multipart form data
                 files = {"file": ("audio.wav", audio_bytes, "audio/wav")}
-                data = {
-                    "model": settings.groq_audio_model,
-                    "response_format": "verbose_json",  # Get timing info
-                    "timestamp_granularities": ["word"]
-                }
+                data = {"model": settings.groq_audio_model}
                 
                 response = await client.post(
                     "https://api.groq.com/openai/v1/audio/transcriptions",
@@ -152,17 +149,27 @@ class AudioEmotionDetector:
                 
                 if response.status_code == 200:
                     result = response.json()
+                    text = result.get("text", "")
+                    
+                    # Estimate duration from audio bytes (Groq doesn't always return duration)
+                    # Assuming 16kHz, 16-bit, mono WAV
+                    estimated_duration = len(audio_bytes) / (16000 * 2)
+                    estimated_duration = max(0.5, min(estimated_duration, 300))
+                    
                     return {
-                        "text": result.get("text", ""),
-                        "duration": result.get("duration", 0.0),
+                        "text": text,
+                        "duration": result.get("duration", estimated_duration),
                         "words": result.get("words", []),
                         "segments": result.get("segments", [])
                     }
                 else:
                     logger.warning(f"Groq transcription error {response.status_code}: {response.text}")
+                    # Fallback to estimation
+                    return await self._estimate_timing(audio_bytes)
                     
         except Exception as e:
             logger.error(f"Groq transcription error: {str(e)}")
+            return await self._estimate_timing(audio_bytes)
             
         return {}
 
@@ -420,26 +427,24 @@ class AudioEmotionDetector:
         return self._simple_emotion_analysis(text)
 
     async def _openrouter_emotion_analysis(self, text: str) -> Dict:
-        """Analyze emotion using OpenRouter."""
+        """Analyze emotion using OpenRouter (FREE models)."""
         try:
             async with httpx.AsyncClient(timeout=20.0) as client:
                 response = await client.post(
                     "https://openrouter.ai/api/v1/chat/completions",
                     headers={**self.openrouter_headers, "Content-Type": "application/json"},
                     json={
-                        "model": settings.openrouter_model_2,
+                        "model": settings.openrouter_model_2,  # Free model
                         "messages": [{
                             "role": "user",
-                            "content": f"""
-                            Analyze the emotional tone of this text: "{text}"
+                            "content": f"""Analyze emotion of this text: "{text}"
                             
-                            Classify into: angry, fear, happy, neutral, sad, surprise
-                            
-                            Respond with JSON: {{"emotion": "emotion_name", "confidence": 0.85}}
-                            """
+Classify into: angry, fear, happy, neutral, sad, surprise
+
+Respond ONLY with JSON: {{"emotion": "emotion_name", "confidence": 0.85}}"""
                         }],
                         "temperature": 0.1,
-                        "max_tokens": 100
+                        "max_tokens": 50
                     }
                 )
                 
@@ -448,19 +453,22 @@ class AudioEmotionDetector:
                     content = result["choices"][0]["message"]["content"]
                     
                     try:
-                        emotion_data = json.loads(content)
-                        emotion = emotion_data.get("emotion", "neutral")
-                        confidence = emotion_data.get("confidence", 0.5)
-                        
-                        all_scores = {e: 0.1 for e in self.emotion_labels}
-                        all_scores[emotion] = confidence
-                        
-                        return {
-                            "emotion": emotion,
-                            "confidence": confidence,
-                            "all_scores": all_scores
-                        }
-                    except json.JSONDecodeError:
+                        # Extract JSON from response
+                        json_match = re.search(r'\{[^}]+\}', content)
+                        if json_match:
+                            emotion_data = json.loads(json_match.group())
+                            emotion = emotion_data.get("emotion", "neutral")
+                            confidence = emotion_data.get("confidence", 0.5)
+                            
+                            all_scores = {e: 0.1 for e in self.emotion_labels}
+                            all_scores[emotion] = confidence
+                            
+                            return {
+                                "emotion": emotion,
+                                "confidence": confidence,
+                                "all_scores": all_scores
+                            }
+                    except (json.JSONDecodeError, AttributeError):
                         pass
                         
         except Exception as e:
