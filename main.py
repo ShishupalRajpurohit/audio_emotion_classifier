@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from typing import Dict, List, Optional
 import structlog
 import uvicorn
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -188,8 +188,8 @@ async def health_check():
 @app.post("/api/detect", response_model=EmotionResponse)
 @limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_minutes}minute")
 async def detect_emotion(
-    request: AudioEmotionRequest,
-    http_request=None
+    request: Request,  # Add this parameter for rate limiter
+    audio_request: AudioEmotionRequest
 ) -> EmotionResponse:
     """Detect emotions from audio with speaker diarization."""
     if not detector:
@@ -199,17 +199,17 @@ async def detect_emotion(
     
     try:
         logger.info("Processing audio emotion detection request",
-                   provider=request.model_provider,
-                   model=request.model_name,
-                   diarization=request.include_diarization,
+                   provider=audio_request.model_provider,
+                   model=audio_request.model_name,
+                   diarization=audio_request.include_diarization,
                    api_only=True)
         
         result = await detector.process_audio(
-            audio_data=request.audio_data,
-            model_provider=request.model_provider,
-            model_name=request.model_name,
-            include_diarization=request.include_diarization,
-            return_segments=request.return_segments
+            audio_data=audio_request.audio_data,
+            model_provider=audio_request.model_provider,
+            model_name=audio_request.model_name,
+            include_diarization=audio_request.include_diarization,
+            return_segments=audio_request.return_segments
         )
         
         processing_time = (time.time() - start_time) * 1000
@@ -230,7 +230,7 @@ async def detect_emotion(
 @app.post("/api/detect/file")
 @limiter.limit(f"{settings.rate_limit_requests}/{settings.rate_limit_minutes}minute")
 async def detect_emotion_from_file(
-    http_request=None,
+    request: Request,  # Add this parameter for rate limiter
     file: UploadFile = File(...),
     model_provider: str = Form("huggingface"),
     model_name: Optional[str] = Form(None),
@@ -415,14 +415,16 @@ if __name__ == "__main__":
     
     # Get port from environment or use default
     port = int(os.environ.get("PORT", 8000))
+    host = "127.0.0.1"  # Use localhost instead of 0.0.0.0 for development
     
     logger.info("Starting Audio Emotion Classifier server",
                port=port,
+               host=host,
                log_level=settings.log_level)
     
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
+        host=host,
         port=port,
         reload="--reload" in sys.argv,
         access_log=True
