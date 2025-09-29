@@ -22,21 +22,24 @@ class Settings(BaseSettings):
     max_audio_duration_seconds: int = 300
     
     # Model Configuration from Environment (ALL FREE MODELS)
-    hf_model_primary: str = "openai/whisper-tiny"
-    hf_model_backup: str = "facebook/wav2vec2-base-960h"
+    # Audio emotion recognition (analyzes voice tone/prosody)
+    hf_audio_emotion_model: str = "ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition"
+    hf_audio_emotion_backup: str = "superb/hubert-large-superb-er"
+    
+    # Transcription models
     groq_audio_model: str = "whisper-large-v3-turbo"
     groq_llm_model: str = "llama-3.1-8b-instant"
     openrouter_model_1: str = "meta-llama/llama-3.1-8b-instruct:free"
     openrouter_model_2: str = "nousresearch/hermes-3-llama-3.1-405b:free"
     
-    # Backward compatibility properties
+    # Backward compatibility
     @property
     def default_hf_model(self) -> str:
-        return self.hf_model_primary
+        return self.hf_audio_emotion_model
     
     @property
     def backup_hf_model(self) -> str:
-        return self.hf_model_backup
+        return self.hf_audio_emotion_backup
     
     class Config:
         env_file = ".env"
